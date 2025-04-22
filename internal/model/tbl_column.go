@@ -49,10 +49,11 @@ func (c *Column) ToField(nullable, coverable, signable bool) *Field {
 	if signable && strings.Contains(c.columnType(), "unsigned") && strings.HasPrefix(fieldType, "int") {
 		fieldType = "u" + fieldType
 	}
+	tag, _ := c.defaultTagValue()
 	switch {
 	case c.Name() == "deleted_at" && fieldType == "time.Time":
 		fieldType = "gorm.DeletedAt"
-	case coverable && c.needDefaultTag(c.defaultTagValue()):
+	case coverable && c.needDefaultTag(tag):
 		fieldType = "*" + fieldType
 	case nullable && !strings.HasPrefix(fieldType, "*"):
 		if n, ok := c.Nullable(); ok && n {
@@ -110,8 +111,8 @@ func (c *Column) buildGormTag() field.GormTag {
 			tag.Append(field.TagKeyGormIndex, fmt.Sprintf("%s,priority:%d", idx.Name(), idx.Priority))
 		}
 	}
-
-	if dtValue := c.defaultTagValue(); c.needDefaultTag(dtValue) { // cannot set default tag for primary key
+	//if dtValue := c.defaultTagValue(); c.needDefaultTag(dtValue) {
+	if dtValue, exist := c.defaultTagValue(); exist { // cannot set default tag for primary key
 		tag.Set(field.TagKeyGormDefault, dtValue)
 	}
 	if comment, ok := c.Comment(); ok && comment != "" {
@@ -142,15 +143,15 @@ func (c *Column) needDefaultTag(defaultTagValue string) bool {
 }
 
 // defaultTagValue return gorm default tag's value
-func (c *Column) defaultTagValue() string {
+func (c *Column) defaultTagValue() (string, bool) {
 	value, ok := c.DefaultValue()
 	if !ok {
-		return ""
+		return value, ok
 	}
 	if value != "" && strings.TrimSpace(value) == "" {
-		return "'" + value + "'"
+		return "'" + value + "'", ok
 	}
-	return value
+	return value, ok
 }
 
 func (c *Column) columnType() (v string) {
